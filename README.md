@@ -1,5 +1,7 @@
-# Cripto-device-driver---SO-B
-Projeto 1 de SOB
+# Cripto Device Driver Sistemas Operacionais B
 
-Participantes:
-Matheus H. Moretti 
+## Projeto 1 de SO B
+
+### Participantes:
+* Matheus H. Moretti
+* Murilo de Paula Araujo
