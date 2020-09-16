@@ -19,6 +19,41 @@
 #define  DEVICE_NAME "ebbchar"    ///< The device will appear at /dev/ebbchar using this value
 #define  CLASS_NAME  "ebb"        ///< The device class -- this is a character device driver
 
+#include <linux/moduleparam.h>
+#include <linux/stat.h>
+#include <linux/string.h>
+
+
+/* Skcipher kernel crypto API */
+#include <crypto/skcipher.h>
+/* Scatterlist manipulation */
+#include <linux/scatterlist.h>
+/* Error macros */
+#include <linux/err.h>
+
+struct tcrypt_result {
+    struct completion completion;
+    int err;
+};
+
+/* tie all data structures together */
+struct skcipher_def {
+    struct scatterlist sg;
+    struct crypto_skcipher *tfm;
+    struct skcipher_request *req;
+    struct tcrypt_result result;
+};
+
+
+static char *keyp = "";
+module_param(keyp, charp, 0000);
+MODULE_PARM_DESC(keyp, "A character string");
+
+static char *iv = "";
+module_param(iv, charp, 0000);
+MODULE_PARM_DESC(iv, "A character string");
+
+
 
 
 MODULE_LICENSE("GPL");            ///< The license type -- this affects available functionality
@@ -57,7 +92,151 @@ static DEFINE_MUTEX(ebbchar_mutex);
  *  time and that it can be discarded and its memory freed up after that point.
  *  @return returns 0 if successful
  */
+
+static void test_skcipher_cb(struct crypto_async_request *req, int error)
+{
+    struct tcrypt_result *result = req->data;
+
+    if (error == -EINPROGRESS)
+        return;
+    result->err = error;
+    complete(&result->completion);
+    pr_info("Encryption finished successfully\n");
+}
+
+
+
+
+
+static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
+                     int enc)
+{
+    int rc = 0;
+
+    if (enc)
+        rc = crypto_skcipher_encrypt(sk->req);
+    else
+        rc = crypto_skcipher_decrypt(sk->req);
+
+
+	 if (rc)
+            pr_info("skcipher encrypt returned with result %d\n", rc);
+
+
+    return rc;
+}
+
+
+/* Initialize and trigger cipher operation */
+static int test_skcipher(char *scratchpad1,int tam,int tipo)
+{
+	//printk("%d ")
+
+    struct skcipher_def sk;
+    struct crypto_skcipher *skcipher = NULL;
+    struct skcipher_request *req = NULL;
+    char *scratchpad = NULL;
+    char *ivdata = NULL;	
+    unsigned char key[32];
+    int ret = -EFAULT;
+    char *resultdata = NULL;
+
+    skcipher = crypto_alloc_skcipher("cbc(aes)", 0, 0);
+    if (IS_ERR(skcipher)) {
+        pr_info("could not allocate skcipher handle\n");
+        return PTR_ERR(skcipher);
+    }
+
+    req = skcipher_request_alloc(skcipher, GFP_KERNEL);
+    if (!req) {
+        pr_info("could not allocate skcipher request\n");
+        ret = -ENOMEM;
+        goto out;
+    }
+
+    skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+                      test_skcipher_cb,
+                      &sk.result);
+
+	
+	
+    /* AES 256 with random key */
+	//key=keyp;
+	strcpy(key,keyp);
+    if (crypto_skcipher_setkey(skcipher, key, 16)) {
+        pr_info("key could not be set\n");
+        ret = -EAGAIN;
+        goto out;
+    }
+	
+
+    /* IV will be random */
+    ivdata = kmalloc(16, GFP_KERNEL);
+    if (!ivdata) {
+        pr_info("could not allocate ivdata\n");
+        goto out;
+    }
+	strcpy(ivdata,iv);
+	//ivdata=iv;
+
+
+    /* Input data will be random */
+	
+    scratchpad = kmalloc(16, GFP_KERNEL);
+    if (!scratchpad) {
+        pr_info("could not allocate scratchpad\n");
+        goto out;
+    }
+	strcpy(scratchpad,scratchpad1);
+	
+
+    sk.tfm = skcipher;
+    sk.req = req;
+
+    /* We encrypt one block */
+    sg_init_one(&sk.sg, scratchpad, 16);
+    skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+	init_completion(&sk.result.completion);
+	//crypto_init_wait(&sk.wait);
+  
+
+
+    /* encrypt data */
+    ret = test_skcipher_encdec(&sk, tipo);
+    if (ret)
+        goto out;
+
+	
+
+    pr_info("Encryption triggered successfully\n");
+		resultdata=sg_virt(&sk.sg);
+	
+
+	/*print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
+               resultdata, 64, true);*/
+printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ",resultdata);
+	
+out:
+    if (skcipher)
+        crypto_free_skcipher(skcipher);
+    if (req)
+        skcipher_request_free(req);
+    if (ivdata)
+        kfree(ivdata);
+    if (scratchpad)
+        kfree(scratchpad);
+    return ret;
+}
+
+
+
+
+
+
+
 static int __init ebbchar_init(void){
+
+	
    printk(KERN_INFO "EBBChar: Initializing the EBBChar LKM\n");
 
    // Try to dynamically allocate a major number for the device -- more difficult but worth it
@@ -130,7 +309,31 @@ static int dev_open(struct inode *inodep, struct file *filep){
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
    int error_count = 0;
    // copy_to_user has the format ( * to, *from, size) and returns 0 on success
-   error_count = copy_to_user(buffer, message, size_of_message);
+
+	printk(KERN_INFO "ambos  %s  %s",iv,keyp);
+
+error_count = copy_to_user(buffer, message, size_of_message);
+
+	switch(buffer[0])
+	{
+	case 'c':
+		printk(KERN_INFO "horadodulelo  %s  %d",buffer,size_of_message);
+		test_skcipher(buffer+2,size_of_message-2,1);
+		break;
+	case 'd':
+		test_skcipher(buffer+2,size_of_message-2,0);
+		break;
+	case 'h':
+		printk(KERN_INFO "horadotalvezduelo");
+		
+	
+	}
+
+
+
+
+	
+
 
    if (error_count==0){            // if true then have success
       printk(KERN_INFO "EBBChar: Sent %d characters to the user\n", size_of_message);
