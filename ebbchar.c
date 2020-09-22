@@ -1,4 +1,4 @@
-/**
+/*
  * @file   ebbchar.c
  * @author Derek Molloy
  * @date   7 April 2015
@@ -9,20 +9,20 @@
  * this the LKM.
  * @see http://www.derekmolloy.ie/ for a full description and follow-up descriptions.
  */
+
 #include <linux/mutex.h>
-#include <linux/init.h>           // Macros used to mark up functions e.g. __init __exit
-#include <linux/module.h>         // Core header for loading LKMs into the kernel
-#include <linux/device.h>         // Header to support the kernel Driver Model
-#include <linux/kernel.h>         // Contains types, macros, functions for the kernel
-#include <linux/fs.h>             // Header for the Linux file system support
-#include <linux/uaccess.h>          // Required for the copy to user function
-#define  DEVICE_NAME "ebbchar"    ///< The device will appear at /dev/ebbchar using this value
-#define  CLASS_NAME  "ebb"        ///< The device class -- this is a character device driver
+#include <linux/init.h>       // Macros used to mark up functions e.g. __init __exit
+#include <linux/module.h>     // Core header for loading LKMs into the kernel
+#include <linux/device.h>     // Header to support the kernel Driver Model
+#include <linux/kernel.h>     // Contains types, macros, functions for the kernel
+#include <linux/fs.h>         // Header for the Linux file system support
+#include <linux/uaccess.h>    // Required for the copy to user function
+#define DEVICE_NAME "ebbchar" ///< The device will appear at /dev/ebbchar using this value
+#define CLASS_NAME "ebb"      ///< The device class -- this is a character device driver
 
 #include <linux/moduleparam.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-
 
 /* Skcipher kernel crypto API */
 #include <crypto/skcipher.h>
@@ -31,19 +31,20 @@
 /* Error macros */
 #include <linux/err.h>
 
-struct tcrypt_result {
+struct tcrypt_result
+{
     struct completion completion;
     int err;
 };
 
 /* tie all data structures together */
-struct skcipher_def {
+struct skcipher_def
+{
     struct scatterlist sg;
     struct crypto_skcipher *tfm;
     struct skcipher_request *req;
     struct tcrypt_result result;
 };
-
 
 static char *keyp = "";
 module_param(keyp, charp, 0000);
@@ -53,24 +54,22 @@ static char *iv = "";
 module_param(iv, charp, 0000);
 MODULE_PARM_DESC(iv, "A character string");
 
+MODULE_LICENSE("GPL");                                        ///< The license type -- this affects available functionality
+MODULE_AUTHOR("Derek Molloy");                                ///< The author -- visible when you use modinfo
+MODULE_DESCRIPTION("A simple Linux char driver for the BBB"); ///< The description -- see modinfo
+MODULE_VERSION("0.1");                                        ///< A version number to inform users
 
-
-
-MODULE_LICENSE("GPL");            ///< The license type -- this affects available functionality
-MODULE_AUTHOR("Derek Molloy");    ///< The author -- visible when you use modinfo
-MODULE_DESCRIPTION("A simple Linux char driver for the BBB");  ///< The description -- see modinfo
-MODULE_VERSION("0.1");            ///< A version number to inform users
-
-static int    majorNumber;                  ///< Stores the device number -- determined automatically
-static char   message[256] = {0};           ///< Memory for the string that is passed from userspace
-static short  size_of_message;              ///< Used to remember the size of the string stored
-static int    numberOpens = 0;              ///< Counts the number of times the device is opened
-static struct class*  ebbcharClass  = NULL; ///< The device-driver class struct pointer
-static struct device* ebbcharDevice = NULL; ///< The device-driver device struct pointer
+static int majorNumber; ///< Stores the device number -- determined automatically
+static char message[1024] = {0};
+int message_conv[256];                      ///< Memory for the string that is passed from userspace
+static short size_of_message;               ///< Used to remember the size of the string stored
+static int numberOpens = 0;                 ///< Counts the number of times the device is opened
+static struct class *ebbcharClass = NULL;   ///< The device-driver class struct pointer
+static struct device *ebbcharDevice = NULL; ///< The device-driver device struct pointer
 
 // The prototype functions for the character driver -- must come before the struct definition
-static int     dev_open(struct inode *, struct file *);
-static int     dev_release(struct inode *, struct file *);
+static int dev_open(struct inode *, struct file *);
+static int dev_release(struct inode *, struct file *);
 static ssize_t dev_read(struct file *, char *, size_t, loff_t *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 
@@ -79,12 +78,13 @@ static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
  *  using a C99 syntax structure. char devices usually implement open, read, write and release calls
  */
 static struct file_operations fops =
-{
-   .open = dev_open,
-   .read = dev_read,
-   .write = dev_write,
-   .release = dev_release,
+    {
+        .open = dev_open,
+        .read = dev_read,
+        .write = dev_write,
+        .release = dev_release,
 };
+
 static DEFINE_MUTEX(ebbchar_mutex);
 /** @brief The LKM initialization function
  *  The static keyword restricts the visibility of the function to within this C file. The __init
@@ -104,12 +104,51 @@ static void test_skcipher_cb(struct crypto_async_request *req, int error)
     pr_info("Encryption finished successfully\n");
 }
 
+void convertHexaToString(char str[], int *vetor, int tamanho)
+{
+    int cont = 0, cont2 = 0, aux;
 
+    cont = tamanho - 1;
+    aux = cont - 2;
+    cont2 = tamanho / 2 - 1;
 
+    while (cont >= 0)
+    {
+        if (str[cont] >= 48 && str[cont] < 58)
+        {
+            if (cont % 2 == 0)
+                vetor[cont2] += (str[cont] - 48) * 16;
+            else
+                vetor[cont2] += (str[cont] - 48);
+        }
+        else
+        {
+            if (cont % 2 == 0)
+                vetor[cont2] += (str[cont] - 87) * 16;
+            else
+                vetor[cont2] += (str[cont] - 87);
+        }
 
+        cont--;
+
+        if (aux == cont)
+        {
+            aux = cont - 2;
+            cont2--;
+        }
+    }
+
+    // Impressão
+    cont = 0;
+    while (cont < tamanho)
+    {
+        printk("%c \n", vetor[cont]);
+        cont++;
+    }
+}
 
 static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
-                     int enc)
+                                         int enc)
 {
     int rc = 0;
 
@@ -118,77 +157,73 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
     else
         rc = crypto_skcipher_decrypt(sk->req);
 
-
-	 if (rc)
-            pr_info("skcipher encrypt returned with result %d\n", rc);
-
+    if (rc)
+        pr_info("skcipher encrypt returned with result %d\n", rc);
 
     return rc;
 }
 
-
 /* Initialize and trigger cipher operation */
-static int test_skcipher(char *scratchpad1,int tam,int tipo)
+static int test_skcipher(char *scratchpad1, int tam, int tipo)
 {
-	//printk("%d ")
+    //printk("%d ")
 
     struct skcipher_def sk;
     struct crypto_skcipher *skcipher = NULL;
     struct skcipher_request *req = NULL;
     char *scratchpad = NULL;
-    char *ivdata = NULL;	
+    char *ivdata = NULL;
     unsigned char key[32];
     int ret = -EFAULT;
     char *resultdata = NULL;
 
     skcipher = crypto_alloc_skcipher("cbc(aes)", 0, 0);
-    if (IS_ERR(skcipher)) {
+    if (IS_ERR(skcipher))
+    {
         pr_info("could not allocate skcipher handle\n");
         return PTR_ERR(skcipher);
     }
 
     req = skcipher_request_alloc(skcipher, GFP_KERNEL);
-    if (!req) {
+    if (!req)
+    {
         pr_info("could not allocate skcipher request\n");
         ret = -ENOMEM;
         goto out;
     }
 
     skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
-                      test_skcipher_cb,
-                      &sk.result);
+                                  test_skcipher_cb,
+                                  &sk.result);
 
-	
-	
     /* AES 256 with random key */
-	//key=keyp;
-	strcpy(key,keyp);
-    if (crypto_skcipher_setkey(skcipher, key, 16)) {
+    //key=keyp;
+    strcpy(key, keyp);
+    if (crypto_skcipher_setkey(skcipher, key, 16))
+    {
         pr_info("key could not be set\n");
         ret = -EAGAIN;
         goto out;
     }
-	
 
     /* IV will be random */
     ivdata = kmalloc(16, GFP_KERNEL);
-    if (!ivdata) {
+    if (!ivdata)
+    {
         pr_info("could not allocate ivdata\n");
         goto out;
     }
-	strcpy(ivdata,iv);
-	//ivdata=iv;
-
+    strcpy(ivdata, iv);
+    //ivdata=iv;
 
     /* Input data will be random */
-	
     scratchpad = kmalloc(16, GFP_KERNEL);
-    if (!scratchpad) {
+    if (!scratchpad)
+    {
         pr_info("could not allocate scratchpad\n");
         goto out;
     }
-	strcpy(scratchpad,scratchpad1);
-	
+    strcpy(scratchpad, scratchpad1);
 
     sk.tfm = skcipher;
     sk.req = req;
@@ -196,26 +231,21 @@ static int test_skcipher(char *scratchpad1,int tam,int tipo)
     /* We encrypt one block */
     sg_init_one(&sk.sg, scratchpad, 16);
     skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
-	init_completion(&sk.result.completion);
-	//crypto_init_wait(&sk.wait);
-  
-
+    init_completion(&sk.result.completion);
+    //crypto_init_wait(&sk.wait);
 
     /* encrypt data */
     ret = test_skcipher_encdec(&sk, tipo);
     if (ret)
         goto out;
 
-	
-
     pr_info("Encryption triggered successfully\n");
-		resultdata=sg_virt(&sk.sg);
-	
+    resultdata = sg_virt(&sk.sg);
 
-	/*print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
+    /*print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
                resultdata, 64, true);*/
-printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ",resultdata);
-	
+    printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ", resultdata);
+
 out:
     if (skcipher)
         crypto_free_skcipher(skcipher);
@@ -228,59 +258,57 @@ out:
     return ret;
 }
 
+static int __init ebbchar_init(void)
+{
 
+    printk(KERN_INFO "EBBChar: Initializing the EBBChar LKM\n");
 
+    // Try to dynamically allocate a major number for the device -- more difficult but worth it
+    majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
+    if (majorNumber < 0)
+    {
+        printk(KERN_ALERT "EBBChar failed to register a major number\n");
+        return majorNumber;
+    }
+    printk(KERN_INFO "EBBChar: registered correctly with major number %d\n", majorNumber);
 
+    // Register the device class
+    ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
+    if (IS_ERR(ebbcharClass))
+    { // Check for error and clean up if there is
+        unregister_chrdev(majorNumber, DEVICE_NAME);
+        printk(KERN_ALERT "Failed to register device class\n");
+        return PTR_ERR(ebbcharClass); // Correct way to return an error on a pointer
+    }
+    printk(KERN_INFO "EBBChar: device class registered correctly\n");
 
+    // Register the device driver
+    ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(ebbcharDevice))
+    {                                // Clean up if there is an error
+        class_destroy(ebbcharClass); // Repeated code but the alternative is goto statements
+        unregister_chrdev(majorNumber, DEVICE_NAME);
+        printk(KERN_ALERT "Failed to create the device\n");
+        return PTR_ERR(ebbcharDevice);
+    }
+    printk(KERN_INFO "EBBChar: device class created correctly\n"); // Made it! device was initialized
 
-
-static int __init ebbchar_init(void){
-
-	
-   printk(KERN_INFO "EBBChar: Initializing the EBBChar LKM\n");
-
-   // Try to dynamically allocate a major number for the device -- more difficult but worth it
-   majorNumber = register_chrdev(0, DEVICE_NAME, &fops);
-   if (majorNumber<0){
-      printk(KERN_ALERT "EBBChar failed to register a major number\n");
-      return majorNumber;
-   }
-   printk(KERN_INFO "EBBChar: registered correctly with major number %d\n", majorNumber);
-
-   // Register the device class
-   ebbcharClass = class_create(THIS_MODULE, CLASS_NAME);
-   if (IS_ERR(ebbcharClass)){                // Check for error and clean up if there is
-      unregister_chrdev(majorNumber, DEVICE_NAME);
-      printk(KERN_ALERT "Failed to register device class\n");
-      return PTR_ERR(ebbcharClass);          // Correct way to return an error on a pointer
-   }
-   printk(KERN_INFO "EBBChar: device class registered correctly\n");
-
-   // Register the device driver
-   ebbcharDevice = device_create(ebbcharClass, NULL, MKDEV(majorNumber, 0), NULL, DEVICE_NAME);
-   if (IS_ERR(ebbcharDevice)){               // Clean up if there is an error
-      class_destroy(ebbcharClass);           // Repeated code but the alternative is goto statements
-      unregister_chrdev(majorNumber, DEVICE_NAME);
-      printk(KERN_ALERT "Failed to create the device\n");
-      return PTR_ERR(ebbcharDevice);
-   }
-   printk(KERN_INFO "EBBChar: device class created correctly\n"); // Made it! device was initialized
-
-	mutex_init(&ebbchar_mutex);
-   return 0;
+    mutex_init(&ebbchar_mutex);
+    return 0;
 }
 
 /** @brief The LKM cleanup function
  *  Similar to the initialization function, it is static. The __exit macro notifies that if this
  *  code is used for a built-in driver (not a LKM) that this function is not required.
  */
-static void __exit ebbchar_exit(void){
-mutex_destroy(&ebbchar_mutex);
-   device_destroy(ebbcharClass, MKDEV(majorNumber, 0));     // remove the device
-   class_unregister(ebbcharClass);                          // unregister the device class
-   class_destroy(ebbcharClass);                             // remove the device class
-   unregister_chrdev(majorNumber, DEVICE_NAME);             // unregister the major number
-   printk(KERN_INFO "EBBChar: Goodbye from the LKM!\n");
+static void __exit ebbchar_exit(void)
+{
+    mutex_destroy(&ebbchar_mutex);
+    device_destroy(ebbcharClass, MKDEV(majorNumber, 0)); // remove the device
+    class_unregister(ebbcharClass);                      // unregister the device class
+    class_destroy(ebbcharClass);                         // remove the device class
+    unregister_chrdev(majorNumber, DEVICE_NAME);         // unregister the major number
+    printk(KERN_INFO "EBBChar: Goodbye from the LKM!\n");
 }
 
 /** @brief The device open function that is called each time the device is opened
@@ -288,14 +316,16 @@ mutex_destroy(&ebbchar_mutex);
  *  @param inodep A pointer to an inode object (defined in linux/fs.h)
  *  @param filep A pointer to a file object (defined in linux/fs.h)
  */
-static int dev_open(struct inode *inodep, struct file *filep){
-  if(!mutex_trylock(&ebbchar_mutex)){                  // Try to acquire the mutex (returns 0 on fail)
-	printk(KERN_ALERT "EBBChar: Device in use by another process");
-	return -EBUSY;
-   }
-   numberOpens++;
-   printk(KERN_INFO "EBBChar: Device has been opened %d time(s)\n", numberOpens);
-   return 0;
+static int dev_open(struct inode *inodep, struct file *filep)
+{
+    if (!mutex_trylock(&ebbchar_mutex))
+    { // Try to acquire the mutex (returns 0 on fail)
+        printk(KERN_ALERT "EBBChar: Device in use by another process");
+        return -EBUSY;
+    }
+    numberOpens++;
+    printk(KERN_INFO "EBBChar: Device has been opened %d time(s)\n", numberOpens);
+    return 0;
 }
 
 /** @brief This function is called whenever device is being read from user space i.e. data is
@@ -306,14 +336,16 @@ static int dev_open(struct inode *inodep, struct file *filep){
  *  @param len The length of the b
  *  @param offset The offset if required
  */
-static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
-   int error_count = 0;
-   // copy_to_user has the format ( * to, *from, size) and returns 0 on success
+static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset)
+{
+    int error_count = 0;
+    // copy_to_user has the format ( * to, *from, size) and returns 0 on success
 
-	printk(KERN_INFO "ambos  %s  %s",iv,keyp);
+    error_count = copy_to_user(buffer, message, size_of_message);
+    //
+    //convertHexaToString(message+2,message_conv,(size_of_message-2));
 
-error_count = copy_to_user(buffer, message, size_of_message);
-
+    /*
 	switch(buffer[0])
 	{
 	case 'c':
@@ -325,24 +357,19 @@ error_count = copy_to_user(buffer, message, size_of_message);
 		break;
 	case 'h':
 		printk(KERN_INFO "horadotalvezduelo");
-		
-	
 	}
+*/
 
-
-
-
-	
-
-
-   if (error_count==0){            // if true then have success
-      printk(KERN_INFO "EBBChar: Sent %d characters to the user\n", size_of_message);
-      return (size_of_message=0);  // clear the position to the start and return 0
-   }
-   else {
-      printk(KERN_INFO "EBBChar: Failed to send %d characters to the user\n", error_count);
-      return -EFAULT;              // Failed -- return a bad address message (i.e. -14)
-   }
+    if (error_count == 0)
+    { // if true then have success
+        printk(KERN_INFO "EBBChar: Sent %d characters to the user\n", size_of_message);
+        return (size_of_message = 0); // clear the position to the start and return 0
+    }
+    else
+    {
+        printk(KERN_INFO "EBBChar: Failed to send %d characters to the user\n", error_count);
+        return -EFAULT; // Failed -- return a bad address message (i.e. -14)
+    }
 }
 
 /** @brief This function is called whenever the device is being written to from user space i.e.
@@ -353,11 +380,27 @@ error_count = copy_to_user(buffer, message, size_of_message);
  *  @param len The length of the array of data that is being passed in the const char buffer
  *  @param offset The offset if required
  */
-static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset){
-   sprintf(message, "%s(%zu letters)", buffer, len);   // appending received string with its length
-   size_of_message = strlen(message);                 // store the length of the stored message
-   printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
-   return len;
+static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
+{
+    printk("bufferzaooo: %s ", buffer);
+    convertHexaToString(buffer + 2, message_conv, 512);
+    switch (buffer[0])
+    {
+    case 'c':
+        printk(KERN_INFO "horadodulelo  %s  %d", buffer, size_of_message);
+        test_skcipher((char *)message_conv, 256, 1);
+        break;
+    case 'd':
+        test_skcipher((char *)message_conv, 256, 0);
+        break;
+    case 'h':
+        printk(KERN_INFO "horadotalvezduelo");
+    }
+    sprintf(message, "%s(%zu letters)", buffer, len); // appending received string with its length
+    size_of_message = strlen(message);                // store the length of the stored message
+    printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
+
+    return len;
 }
 
 /** @brief The device release function that is called whenever the device is closed/released by
@@ -365,10 +408,11 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
  *  @param inodep A pointer to an inode object (defined in linux/fs.h)
  *  @param filep A pointer to a file object (defined in linux/fs.h)
  */
-static int dev_release(struct inode *inodep, struct file *filep){
-	mutex_unlock(&ebbchar_mutex);
-   printk(KERN_INFO "EBBChar: Device successfully closed\n");
-   return 0;
+static int dev_release(struct inode *inodep, struct file *filep)
+{
+    mutex_unlock(&ebbchar_mutex);
+    printk(KERN_INFO "EBBChar: Device successfully closed\n");
+    return 0;
 }
 
 /** @brief A module must use the module_init() module_exit() macros from linux/init.h, which
