@@ -14,21 +14,111 @@
 #include<fcntl.h>
 #include<string.h>
 #include<unistd.h>
+#include<string.h>
 
 #define BUFFER_LENGTH 256               ///< The buffer length (crude but fine)
-static char receive[BUFFER_LENGTH];     ///< The receive buffer from the LKM
+static char receive[2*BUFFER_LENGTH+2];     ///< The receive buffer from the LKM
+
+
+int toString(int n)
+{
+if(n>9)
+{
+n+=87;
+
+}
+else
+{
+n+=48;
+}
+return n;
+}
+
+
 
 int main(){
    int ret, fd;
-   char stringToSend[BUFFER_LENGTH];
+	int tipo=0,opcao=0,tam=0;
+   char stringToSend[2*BUFFER_LENGTH+2];
+   char lerHex[2*BUFFER_LENGTH];
+   char converter[BUFFER_LENGTH];
+	int j=2;
+	
+   
+
+	
    printf("Starting device test code example...\n");
    fd = open("/dev/ebbchar", O_RDWR);             // Open the device with read/write access
    if (fd < 0){
       perror("Failed to open the device...");
       return errno;
    }
-   printf("Type in a short string to send to the kernel module:\n");
-   scanf("%[^\n]%*c", stringToSend);                // Read in a string (with spaces)
+	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n Selecione uma opção:");
+	scanf("%d",&tipo);
+	printf("1- entrada em string \n 2- entrada em hexa \n selecione uma opção:");
+	scanf("%d",&opcao);
+	
+	switch(tipo)
+	{
+	 case 1:
+	stringToSend[0]='c';
+	stringToSend[1]=' ';	
+	break;
+	case 2:
+	stringToSend[0]='d';
+	stringToSend[1]=' ';
+	break;
+	
+
+	}
+	
+	if(opcao==1)
+	{
+
+	printf("digite uma string para o kernel \n");
+	__fpurge(stdin);
+	scanf("%[^\n]%*c", converter);
+	tam=strlen(converter);
+	
+	for(int k=tam;k<BUFFER_LENGTH;k++)
+	{
+	 converter[k]='\0';
+	}
+	
+
+	for(int i=0;i<BUFFER_LENGTH;i++)
+	{
+	stringToSend[j]=toString((int )converter[i]/16);
+	j++;
+	stringToSend[j]=toString((int )converter[i]%16);
+	j++;
+	}
+	stringToSend[j]='\0';
+	
+
+	}
+else
+{
+printf("digite uma string para o kernel \n");
+__fpurge(stdin);
+scanf("%[^\n]%*c", lerHex);
+tam=strlen(converter);
+for(int k=tam;k<2*BUFFER_LENGTH;k++)
+	{
+	 lerHex[k]='0';
+	}
+
+
+for(int i=0;i<2*BUFFER_LENGTH;i++)
+{
+ stringToSend[j]=lerHex[i];
+j++;
+}
+stringToSend[j]='\0';
+
+
+}
+	printf("%d fgdgf \n",strlen(stringToSend));
    printf("Writing message to the device [%s].\n", stringToSend);
    ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
    if (ret < 0){
