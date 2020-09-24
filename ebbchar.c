@@ -106,43 +106,41 @@ static void test_skcipher_cb(struct crypto_async_request *req, int error)
 
 void convertHexaToString(char str[], int *vetor, int tamanho)
 {
-    int cont = 0, cont2 = 0, aux;
+    int cont=0, cont2=0, aux=0;
 
-    cont = tamanho - 1;
-    aux = cont - 2;
-    cont2 = tamanho / 2 - 1;
+    aux = 2;
 
-    while (cont >= 0)
+    while(cont <= tamanho-1)
     {
-        if (str[cont] >= 48 && str[cont] < 58)
+        if(str[cont] >= 48 && str[cont] < 58) // If entre 0 e 9
         {
-            if (cont % 2 == 0)
-                vetor[cont2] += (str[cont] - 48) * 16;
+            if(cont%2==0) // Par
+                vetor[cont2] += (str[cont]-48)*16;
             else
-                vetor[cont2] += (str[cont] - 48);
+                vetor[cont2] += (str[cont]-48);
         }
         else
         {
-            if (cont % 2 == 0)
-                vetor[cont2] += (str[cont] - 87) * 16;
+            if(cont%2==0) // Impar
+                vetor[cont2] += (str[cont]-87)*16;
             else
-                vetor[cont2] += (str[cont] - 87);
+                vetor[cont2] += (str[cont]-87);
         }
 
-        cont--;
+        cont++;
 
-        if (aux == cont)
+        if(aux == cont)
         {
-            aux = cont - 2;
-            cont2--;
+            aux += 2;
+            cont2++;
         }
     }
 
     // Impressão
-    cont = 0;
+    cont=0;
     while (cont < tamanho)
     {
-        printk("%c \n", vetor[cont]);
+        printf("%c", vetor[cont]);
         cont++;
     }
 }

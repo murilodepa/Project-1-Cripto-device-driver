@@ -53,9 +53,11 @@ int main(){
       perror("Failed to open the device...");
       return errno;
    }
-	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n Selecione uma opção:");
+
+do{
+	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n 4- Cancelar \nSelecione uma opção:");
 	scanf("%d",&tipo);
-	printf("1- entrada em string \n 2- entrada em hexa \n selecione uma opção:");
+	printf("1- Entrada em string \n 2- Entrada em hexa \n selecione uma opção:");
 	scanf("%d",&opcao);
 	
 	switch(tipo)
@@ -136,6 +138,7 @@ stringToSend[j]='\0';
       return errno;
    }
    printf("The received message is: [%s]\n", receive);
+}while(tipo != 4);
    printf("End of the program\n");
    return 0;
 }
