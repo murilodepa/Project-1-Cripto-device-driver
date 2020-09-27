@@ -69,6 +69,10 @@ int main(){
 	stringToSend[0]='d';
 	stringToSend[1]=' ';
 	break;
+	case 3:
+	stringToSend[0]='s';
+	stringToSend[1]=' ';
+	break;
 	
 
 	}

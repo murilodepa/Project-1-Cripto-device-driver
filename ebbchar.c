@@ -31,6 +31,8 @@
 /* Error macros */
 #include <linux/err.h>
 
+#include <crypto/hash.h>
+
 struct tcrypt_result
 {
     struct completion completion;
@@ -385,6 +387,40 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     }
 }
 
+void func_hash(char *buffer, int tam){
+	
+	struct shash_desc *desc;
+	struct crypto_shash *tfm;
+	int rc=0;
+
+	char hashText[21]={0};
+	
+	desc=vmalloc(sizeof(struct shash_desc));
+	desc->tfm = crypto_alloc_shash("sha1", 0, 0);
+	//desc->flags = 0;
+
+
+	rc = crypto_shash_init(desc);
+	if(rc){
+	printk("deu ruim na crypto hash init");
+	}
+	rc= crypto_shash_update(desc, buffer, tam);
+	if(rc){
+	printk("deu ruim na crypto hash update");
+	}
+
+	rc=crypto_shash_final(desc, hashText);
+	if(rc){
+	printk("deu ruim na crypto hash final");
+	}
+	
+	
+	print_hex_dump(KERN_DEBUG,"SHAZAOO - ",DUMP_PREFIX_NONE,20,1,hashText,20,true);
+
+
+	crypto_free_shash(desc->tfm);
+}
+
 /** @brief This function is called whenever the device is being written to from user space i.e.
  *  data is sent to the device from the user. The data is copied to the message[] array in this
  *  LKM using the sprintf() function along with the length of the string.
@@ -411,6 +447,9 @@ int l=0;
         break;
     case 'd':
         test_skcipher((char *)message_conv, 256, 0);
+        break;
+    case 's':
+        func_hash((char *)message_conv, 16);
         break;
     case 'h':
         printk(KERN_INFO "horadotalvezduelo");
