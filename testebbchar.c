@@ -54,12 +54,8 @@ int main(){
       return errno;
    }
 
-do{
-
 	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n 4- Cancelar \nSelecione uma opção:");
 	scanf("%d",&tipo);
-	
-	if(tipo!=4){
 	printf("1- Entrada em string \n 2- Entrada em hexa \n selecione uma opção:");
 	scanf("%d",&opcao);
 	
@@ -138,7 +134,6 @@ stringToSend[j]='\0';
    printf("Press ENTER to read back from the device...\n");
    getchar();
 
-
    printf("Reading from the device...\n");
    ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
    if (ret < 0){
@@ -146,10 +141,6 @@ stringToSend[j]='\0';
       return errno;
    }
    printf("The received message is: [%s]\n", receive);
-	}
-}while(tipo!=4);
-
    printf("End of the program\n");
-
    return 0;
 }
