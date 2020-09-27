@@ -16,8 +16,8 @@
 #include<unistd.h>
 #include<string.h>
 
-#define BUFFER_LENGTH 256               ///< The buffer length (crude but fine)
-static char receive[2*BUFFER_LENGTH+2];     ///< The receive buffer from the LKM
+#define BUFFER_LENGTH 16               ///< The buffer length (crude but fine)
+static char receive[2*BUFFER_LENGTH+3];     ///< The receive buffer from the LKM
 
 
 int toString(int n)
@@ -39,8 +39,8 @@ return n;
 int main(){
    int ret, fd;
 	int tipo=0,opcao=0,tam=0;
-   char stringToSend[2*BUFFER_LENGTH+2];
-   char lerHex[2*BUFFER_LENGTH];
+   char stringToSend[2*BUFFER_LENGTH+3];
+   char lerHex[2*BUFFER_LENGTH+1];
    char converter[BUFFER_LENGTH];
 	int j=2;
 	
@@ -55,8 +55,11 @@ int main(){
    }
 
 do{
+
 	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n 4- Cancelar \nSelecione uma opção:");
 	scanf("%d",&tipo);
+	
+	if(tipo!=4){
 	printf("1- Entrada em string \n 2- Entrada em hexa \n selecione uma opção:");
 	scanf("%d",&opcao);
 	
@@ -84,7 +87,7 @@ do{
 	
 	for(int k=tam;k<BUFFER_LENGTH;k++)
 	{
-	 converter[k]='\0';
+	 converter[k]='0';
 	}
 	
 
@@ -104,10 +107,14 @@ else
 printf("digite uma string para o kernel \n");
 __fpurge(stdin);
 scanf("%[^\n]%*c", lerHex);
-tam=strlen(converter);
+tam=strlen(lerHex);
+printf("\n tam %d",tam);
 for(int k=tam;k<2*BUFFER_LENGTH;k++)
 	{
-	 lerHex[k]='0';
+	printf("\n %d",k);
+	 lerHex[k]='3';
+	k++;
+	lerHex[k]='0';
 	}
 
 
@@ -131,6 +138,7 @@ stringToSend[j]='\0';
    printf("Press ENTER to read back from the device...\n");
    getchar();
 
+
    printf("Reading from the device...\n");
    ret = read(fd, receive, BUFFER_LENGTH);        // Read the response from the LKM
    if (ret < 0){
@@ -138,7 +146,10 @@ stringToSend[j]='\0';
       return errno;
    }
    printf("The received message is: [%s]\n", receive);
-}while(tipo != 4);
+	}
+}while(tipo!=4);
+
    printf("End of the program\n");
+
    return 0;
 }

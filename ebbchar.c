@@ -61,7 +61,8 @@ MODULE_VERSION("0.1");                                        ///< A version num
 
 static int majorNumber; ///< Stores the device number -- determined automatically
 static char message[1024] = {0};
-int message_conv[256];                      ///< Memory for the string that is passed from userspace
+char result[32];
+char message_conv[34];                      ///< Memory for the string that is passed from userspace
 static short size_of_message;               ///< Used to remember the size of the string stored
 static int numberOpens = 0;                 ///< Counts the number of times the device is opened
 static struct class *ebbcharClass = NULL;   ///< The device-driver class struct pointer
@@ -104,46 +105,59 @@ static void test_skcipher_cb(struct crypto_async_request *req, int error)
     pr_info("Encryption finished successfully\n");
 }
 
-void convertHexaToString(char str[], int *vetor, int tamanho)
+void conv(char* vet, char * resul)
 {
-    int cont=0, cont2=0, aux=0;
-
-    aux = 2;
-
-    while(cont <= tamanho-1)
+int    calc=0;
+    int j=0;
+    int i=0;
+    while(i<32)
     {
-        if(str[cont] >= 48 && str[cont] < 58) // If entre 0 e 9
+        if(vet[i]>96)
         {
-            if(cont%2==0) // Par
-                vetor[cont2] += (str[cont]-48)*16;
-            else
-                vetor[cont2] += (str[cont]-48);
+            calc+=(vet[i]-87)*16;
         }
         else
         {
-            if(cont%2==0) // Impar
-                vetor[cont2] += (str[cont]-87)*16;
-            else
-                vetor[cont2] += (str[cont]-87);
+            calc+=(vet[i]-48)*16;
         }
 
-        cont++;
-
-        if(aux == cont)
+                if(vet[i+1]>96)
         {
-            aux += 2;
-            cont2++;
+            calc+=(vet[i+1]-87);
         }
+        else
+        {
+            calc+=(vet[i+1]-48);
+        }
+        resul[j]=calc;
+        calc=0;
+        j++;
+        i+=2;
+
     }
 
-    // Impressão
-    cont=0;
-    while (cont < tamanho)
-    {
-        printf("%c", vetor[cont]);
-        cont++;
-    }
 }
+
+
+
+int toString(unsigned char n)
+{
+//printk("%d",n);
+
+if(n>9)
+{
+n+=87;
+
+}
+else
+{
+n+=48;
+}
+printk("%d",n);
+return n;
+}
+
+
 
 static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
                                          int enc)
@@ -190,9 +204,9 @@ static int test_skcipher(char *scratchpad1, int tam, int tipo)
         goto out;
     }
 
-    skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+        skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
                                   test_skcipher_cb,
-                                  &sk.result);
+&sk.result);
 
     /* AES 256 with random key */
     //key=keyp;
@@ -239,10 +253,11 @@ static int test_skcipher(char *scratchpad1, int tam, int tipo)
 
     pr_info("Encryption triggered successfully\n");
     resultdata = sg_virt(&sk.sg);
+	strcpy(result,resultdata);
 
-    /*print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
-               resultdata, 64, true);*/
-    printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ", resultdata);
+    print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
+               resultdata, 64, true);
+   // printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ", resultdata);
 
 out:
     if (skcipher)
@@ -380,13 +395,19 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
  */
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
-    printk("bufferzaooo: %s ", buffer);
-    convertHexaToString(buffer + 2, message_conv, 512);
+    printk("bufferzaooo: %s  %d", (buffer+2),len-2);
+   // convertHexaToString(buffer + 1, message_conv, len-1);
+
+	//h2c(buffer+2,(char *)message_conv,64);
+	conv((buffer+2),message_conv);
+int l=0;
+
+
+
     switch (buffer[0])
     {
     case 'c':
-        printk(KERN_INFO "horadodulelo  %s  %d", buffer, size_of_message);
-        test_skcipher((char *)message_conv, 256, 1);
+        test_skcipher((char *)message_conv, 16, 1);
         break;
     case 'd':
         test_skcipher((char *)message_conv, 256, 0);
@@ -394,9 +415,31 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
     case 'h':
         printk(KERN_INFO "horadotalvezduelo");
     }
-    sprintf(message, "%s(%zu letters)", buffer, len); // appending received string with its length
+
+
+	char vet[64];
+	int j=0,i=0;
+		
+	while(i<16)
+	{
+
+	vet[j]=toString((unsigned char )result[i]/16);
+	//printk("%d j",vet[j]);
+	j++;
+	vet[j]=toString((unsigned char )result[i]%16);
+	j++;
+	//printk("%d k",vet[j]);
+	i++;
+	}
+	vet[j]='\0';
+	
+	printk("rererepetir %s",vet);
+
+
+
+    sprintf(message, "%s", vet); // appending received string with its length
     size_of_message = strlen(message);                // store the length of the stored message
-    printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", len);
+    printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", size_of_message);
 
     return len;
 }
