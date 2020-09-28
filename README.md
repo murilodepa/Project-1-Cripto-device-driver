@@ -6,3 +6,5 @@
 * Matheus H. Moretti
 * Murilo de Paula Araujo
 * Giuliano Marques Sanfins
+* Victor Reis
+* Christopher de Oliveira
