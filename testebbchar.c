@@ -19,6 +19,7 @@
 #define BUFFER_LENGTH 16               ///< The buffer length (crude but fine)
 static char receive[2*BUFFER_LENGTH+3];     ///< The receive buffer from the LKM
 
+#define clear()printf("\033[H\033[J")
 
 int toString(int n)
 {
@@ -54,14 +55,22 @@ int main(){
       return errno;
    }
 
-	printf("1- Criptografar \n 2- Descriptografar \n 3- Hash \n 4- Cancelar \nSelecione uma opção:");
+do{
+	//zerando variavel
+	j=2;
+	
+	printf("Selecione o que deseja fazer.\n");
+	printf(" 1- Criptografar \n 2- Descriptografar \n 3- Hash \n 4- Cancelar \nSelecione uma opção:");
 	scanf("%d",&tipo);
-	printf("1- Entrada em string \n 2- Entrada em hexa \n selecione uma opção:");
+	
+	if(tipo!=4){
+	printf("\nSelecione o tipo de entrada desejada.\n");
+	printf(" 1- Entrada em string \n 2- Entrada em hexa \n Selecione uma opção:");
 	scanf("%d",&opcao);
 	
 	switch(tipo)
 	{
-	 case 1:
+	case 1:
 	stringToSend[0]='c';
 	stringToSend[1]=' ';	
 	break;
@@ -73,14 +82,13 @@ int main(){
 	stringToSend[0]='s';
 	stringToSend[1]=' ';
 	break;
-	
 
 	}
 	
 	if(opcao==1)
 	{
 
-	printf("digite uma string para o kernel \n");
+	printf("Digite uma string para o kernel: \n");
 	__fpurge(stdin);
 	scanf("%[^\n]%*c", converter);
 	tam=strlen(converter);
@@ -99,12 +107,11 @@ int main(){
 	j++;
 	}
 	stringToSend[j]='\0';
-	
 
 	}
 else
 {
-printf("digite uma string para o kernel \n");
+printf("Digite uma string para o kernel:\n");
 __fpurge(stdin);
 scanf("%[^\n]%*c", lerHex);
 tam=strlen(lerHex);
@@ -127,8 +134,7 @@ stringToSend[j]='\0';
 
 
 }
-	printf("%d fgdgf \n",strlen(stringToSend));
-   printf("Writing message to the device [%s].\n", stringToSend);
+   printf("\nWriting message to the device [%s].\n", stringToSend);
    ret = write(fd, stringToSend, strlen(stringToSend)); // Send the string to the LKM
    if (ret < 0){
       perror("Failed to write the message to the device.");
@@ -145,6 +151,11 @@ stringToSend[j]='\0';
       return errno;
    }
    printf("The received message is: [%s]\n", receive);
+}
+ printf("\nPress ENTER to clean the screen...\n");
+ getchar();
+ clear();
+}while(tipo!=4);
    printf("End of the program\n");
    return 0;
 }
