@@ -10,6 +10,7 @@
  * @see http://www.derekmolloy.ie/ for a full description and follow-up descriptions.
  */
 
+/* Bibliotecas necessárias para o desenvolvimento do projeto */
 #include <linux/mutex.h>
 #include <linux/init.h>       // Macros used to mark up functions e.g. __init __exit
 #include <linux/module.h>     // Core header for loading LKMs into the kernel
@@ -17,12 +18,12 @@
 #include <linux/kernel.h>     // Contains types, macros, functions for the kernel
 #include <linux/fs.h>         // Header for the Linux file system support
 #include <linux/uaccess.h>    // Required for the copy to user function
-#define DEVICE_NAME "ebbchar" ///< The device will appear at /dev/ebbchar using this value
-#define CLASS_NAME "ebb"      ///< The device class -- this is a character device driver
-
 #include <linux/moduleparam.h>
 #include <linux/stat.h>
 #include <linux/string.h>
+
+#define DEVICE_NAME "ebbchar" ///< The device will appear at /dev/ebbchar using this value
+#define CLASS_NAME "ebb"      ///< The device class -- this is a character device driver
 
 /* Skcipher kernel crypto API */
 #include <crypto/skcipher.h>
@@ -31,6 +32,7 @@
 /* Error macros */
 #include <linux/err.h>
 
+/* Biblioteca necessária para realização do hash */
 #include <crypto/hash.h>
 
 struct tcrypt_result
@@ -64,6 +66,7 @@ MODULE_VERSION("0.1");                                        ///< A version num
 static int majorNumber; ///< Stores the device number -- determined automatically
 static char message[1024] = {0};
 char result[32];
+char hashResult[40];
 char message_conv[34];                      ///< Memory for the string that is passed from userspace
 static short size_of_message;               ///< Used to remember the size of the string stored
 static int numberOpens = 0;                 ///< Counts the number of times the device is opened
@@ -95,7 +98,6 @@ static DEFINE_MUTEX(ebbchar_mutex);
  *  time and that it can be discarded and its memory freed up after that point.
  *  @return returns 0 if successful
  */
-
 static void test_skcipher_cb(struct crypto_async_request *req, int error)
 {
     struct tcrypt_result *result = req->data;
@@ -107,59 +109,52 @@ static void test_skcipher_cb(struct crypto_async_request *req, int error)
     pr_info("Encryption finished successfully\n");
 }
 
-void conv(char* vet, char * resul)
+/* Realiza a conversão de Hexadecimal para String */
+void conv(char *vet, char *resul, int tamanho)
 {
-int    calc=0;
-    int j=0;
-    int i=0;
-    while(i<32)
+    int calc = 0;
+    int j = 0;
+    int i = 0;
+    while (i < tamanho)
     {
-        if(vet[i]>96)
+        if (vet[i] > 96)
         {
-            calc+=(vet[i]-87)*16;
+            calc += (vet[i] - 87) * 16;
         }
         else
         {
-            calc+=(vet[i]-48)*16;
+            calc += (vet[i] - 48) * 16;
         }
 
-                if(vet[i+1]>96)
+        if (vet[i + 1] > 96)
         {
-            calc+=(vet[i+1]-87);
+            calc += (vet[i + 1] - 87);
         }
         else
         {
-            calc+=(vet[i+1]-48);
+            calc += (vet[i + 1] - 48);
         }
-        resul[j]=calc;
-        calc=0;
+        resul[j] = calc;
+        calc = 0;
         j++;
-        i+=2;
-
+        i += 2;
     }
-
+    resul[j] = '\0';
 }
 
-
-
+/* Conversão para string */
 int toString(unsigned char n)
 {
-//printk("%d",n);
-
-if(n>9)
-{
-n+=87;
-
+    if (n > 9)
+    {
+        n += 87;
+    }
+    else
+    {
+        n += 48;
+    }
+    return n;
 }
-else
-{
-n+=48;
-}
-printk("%d",n);
-return n;
-}
-
-
 
 static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
                                          int enc)
@@ -180,8 +175,6 @@ static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
 /* Initialize and trigger cipher operation */
 static int test_skcipher(char *scratchpad1, int tam, int tipo)
 {
-    //printk("%d ")
-
     struct skcipher_def sk;
     struct crypto_skcipher *skcipher = NULL;
     struct skcipher_request *req = NULL;
@@ -206,9 +199,9 @@ static int test_skcipher(char *scratchpad1, int tam, int tipo)
         goto out;
     }
 
-        skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+    skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
                                   test_skcipher_cb,
-&sk.result);
+                                  &sk.result);
 
     /* AES 256 with random key */
     //key=keyp;
@@ -255,11 +248,10 @@ static int test_skcipher(char *scratchpad1, int tam, int tipo)
 
     pr_info("Encryption triggered successfully\n");
     resultdata = sg_virt(&sk.sg);
-	strcpy(result,resultdata);
+    strcpy(result, resultdata);
 
     print_hex_dump(KERN_DEBUG, "encr text: ", DUMP_PREFIX_NONE, 16, 1,
-               resultdata, 64, true);
-   // printk(KERN_INFO "horadodulelo3 ghhgfhgfh  %s  ", resultdata);
+                   resultdata, 64, true);
 
 out:
     if (skcipher)
@@ -357,23 +349,6 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     // copy_to_user has the format ( * to, *from, size) and returns 0 on success
 
     error_count = copy_to_user(buffer, message, size_of_message);
-    //
-    //convertHexaToString(message+2,message_conv,(size_of_message-2));
-
-    /*
-	switch(buffer[0])
-	{
-	case 'c':
-		printk(KERN_INFO "horadodulelo  %s  %d",buffer,size_of_message);
-		test_skcipher(buffer+2,size_of_message-2,1);
-		break;
-	case 'd':
-		test_skcipher(buffer+2,size_of_message-2,0);
-		break;
-	case 'h':
-		printk(KERN_INFO "horadotalvezduelo");
-	}
-*/
 
     if (error_count == 0)
     { // if true then have success
@@ -387,38 +362,42 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
     }
 }
 
-void func_hash(char *buffer, int tam){
-	
-	struct shash_desc *desc;
-	struct crypto_shash *tfm;
-	int rc=0;
+/* Realiza os cálculos necessários do hash */
+void func_hash(char *buffer, int tam)
+{
+    struct shash_desc *desc;
+    struct crypto_shash *tfm;
+    int rc = 0;
+    char hashText[21] = {0};
 
-	char hashText[21]={0};
-	
-	desc=vmalloc(sizeof(struct shash_desc));
-	desc->tfm = crypto_alloc_shash("sha1", 0, 0);
-	//desc->flags = 0;
+    desc = vmalloc(sizeof(struct shash_desc));
+    desc->tfm = crypto_alloc_shash("sha1", 0, 0);
 
+    rc = crypto_shash_init(desc);
+    
+	if (rc)
+    {
+        printk("Erro na execução da crypto hash init");
+    }
+    
+	rc = crypto_shash_update(desc, buffer, tam);
+    
+	if (rc)
+    {
+        printk("Erro na execução da crypto hash update");
+    }
 
-	rc = crypto_shash_init(desc);
-	if(rc){
-	printk("deu ruim na crypto hash init");
-	}
-	rc= crypto_shash_update(desc, buffer, tam);
-	if(rc){
-	printk("deu ruim na crypto hash update");
-	}
+    rc = crypto_shash_final(desc, hashText);
+    
+	if (rc)
+    {
+        printk("Erro na execução da crypto hash final");
+    }
 
-	rc=crypto_shash_final(desc, hashText);
-	if(rc){
-	printk("deu ruim na crypto hash final");
-	}
-	
-	
-	print_hex_dump(KERN_DEBUG,"SHAZAOO - ",DUMP_PREFIX_NONE,20,1,hashText,20,true);
+    print_hex_dump(KERN_DEBUG, "SHAZAOO - ", DUMP_PREFIX_NONE, 20, 1, hashText, 20, true);
+    strcpy(hashResult, hashText);
 
-
-	crypto_free_shash(desc->tfm);
+    crypto_free_shash(desc->tfm);
 }
 
 /** @brief This function is called whenever the device is being written to from user space i.e.
@@ -431,14 +410,8 @@ void func_hash(char *buffer, int tam){
  */
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
 {
-    printk("bufferzaooo: %s  %d", (buffer+2),len-2);
-   // convertHexaToString(buffer + 1, message_conv, len-1);
-
-	//h2c(buffer+2,(char *)message_conv,64);
-	conv((buffer+2),message_conv);
-int l=0;
-
-
+    conv((buffer + 2), message_conv, len - 2);
+    int l = 0;
 
     switch (buffer[0])
     {
@@ -448,36 +421,42 @@ int l=0;
     case 'd':
         test_skcipher((char *)message_conv, 256, 0);
         break;
-    case 's':
-        func_hash((char *)message_conv, 16);
-        break;
     case 'h':
-        printk(KERN_INFO "horadotalvezduelo");
+
+        func_hash((char *)message_conv, strlen(message_conv));
+        break;
     }
 
+    char vet[64];
+    int j = 0, i = 0;
 
-	char vet[64];
-	int j=0,i=0;
-		
-	while(i<16)
-	{
+    if (buffer[0] != 'h')
+    {
+        while (i < 16)
+        {
+            vet[j] = toString((unsigned char)result[i] / 16);
+            j++;
+            vet[j] = toString((unsigned char)result[i] % 16);
+            j++;
+            i++;
+        }
+        vet[j] = '\0';
+    }
+    else
+    {
+        while (i < 20)
+        {
+            vet[j] = toString((unsigned char)hashResult[i] / 16);
+            j++;
+            vet[j] = toString((unsigned char)hashResult[i] % 16);
+            j++;
+            i++;
+        }
+        vet[j] = '\0';
+    }
 
-	vet[j]=toString((unsigned char )result[i]/16);
-	//printk("%d j",vet[j]);
-	j++;
-	vet[j]=toString((unsigned char )result[i]%16);
-	j++;
-	//printk("%d k",vet[j]);
-	i++;
-	}
-	vet[j]='\0';
-	
-	printk("rererepetir %s",vet);
-
-
-
-    sprintf(message, "%s", vet); // appending received string with its length
-    size_of_message = strlen(message);                // store the length of the stored message
+    sprintf(message, "%s", vet);       // appending received string with its length
+    size_of_message = strlen(message); // store the length of the stored message
     printk(KERN_INFO "EBBChar: Received %zu characters from the user\n", size_of_message);
 
     return len;
