@@ -1,10 +1,13 @@
-# Cripto Device Driver Sistemas Operacionais B
+# Cripto Device Driver
 
-## Projeto 1 de SO B
+## Project 1 of Operational System - B
 
-### Participantes:
+### Developers:
+* Christopher de Oliveira
+* Giuliano Marques Sanfins
 * Matheus H. Moretti
 * Murilo de Paula Araujo
-* Giuliano Marques Sanfins
 * Victor Reis
-* Christopher de Oliveira
+
+### Contributions:
+* Contributions and improvements are always welcome.
